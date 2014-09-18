@@ -405,6 +405,9 @@ class LavaClient(object):
                                                 bl1, bl2, bl31, rootfstype,
                                                 bootloadertype, target_type)
 
+    def nexell_reset_or_reboot(self):
+        self.target_device.nexell_reset_or_reboot()
+
     @contextlib.contextmanager
     def runner(self):
         """

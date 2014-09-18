@@ -224,6 +224,9 @@ class Target(object):
                              bl31, rootfstype, bootloadertype, target_type):
         raise NotImplementedError('deploy_linaro_kernel')
 
+    def nexell_reset_or_reboot(self):
+        raise NotImplementedError('nexell_reset_or_reboot')
+
     def power_off(self, proc):
         if proc is not None:
             proc.close()
