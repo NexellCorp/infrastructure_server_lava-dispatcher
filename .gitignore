@@ -1,0 +1,4 @@
+*.pyc
+.gitignore
+.ropeproject
+*.egg-info
