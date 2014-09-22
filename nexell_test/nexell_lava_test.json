@@ -1,0 +1,18 @@
+{
+    "timeout": 2000,
+    "job_name": "nexell lava test",
+    "device_type": "pyrope",
+    "target": "drone-nxp5430",
+    "actions": [
+        {
+            "command": "nexell_reset_or_reboot"
+        },
+        {
+            "command": "nexell_deploy_image",
+            "parameters": {
+                "interface": "fastboot",
+                "image": "file:///tmp/lava-android-image.tar.bz2"
+            }
+        }
+    ]
+}
