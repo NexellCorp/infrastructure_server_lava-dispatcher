@@ -408,6 +408,9 @@ class LavaClient(object):
     def nexell_reset_or_reboot(self):
         self.target_device.nexell_reset_or_reboot()
 
+    def nexell_deploy_image(self, interface, image):
+        self.target_device.nexell_deploy_image(interface=interface, image=image)
+
     @contextlib.contextmanager
     def runner(self):
         """
