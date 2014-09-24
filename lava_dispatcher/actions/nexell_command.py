@@ -34,3 +34,32 @@ class cmd_nexell_deploy_image(BaseAction):
     def run(self, interface, image=None):
         print("cmd_nexell_deploy_image run")
         self.client.nexell_deploy_image(interface=interface, image=image)
+
+
+class cmd_nexell_boot_image(BaseAction):
+
+    parameters_schema = {
+        'type': 'object',
+        'properties': {
+            'type': {'type': 'string'},
+            'check_msg': {'type': 'string'},
+            'timeout': {'type': 'string'},
+            'commands': {'type': 'array', 'items': {'type': 'string'},
+                         'optional': True},
+            'usb_id': {'type': 'string', 'optional': True},
+            'map': {'type': 'string', 'optional': True},
+            'server_ip': {'type': 'string', 'optional': True},
+            'bootcmd': {'type': 'string', 'optional': True},
+            'bootargs': {'type': 'string', 'optional': True},
+            'logcat_check_msg': {'type': 'string', 'optional': True},
+            'logcat_check_timeout': {'type': 'string'},
+        },
+        'additionalProperties': False,
+    }
+
+    @classmethod
+    def validate_parameters(cls, parameters):
+        super(cmd_nexell_boot_image, cls).validate_parameters(parameters)
+
+    def run(self, **params):
+        self.client.nexell_boot_image(params=params)

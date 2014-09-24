@@ -400,16 +400,23 @@ class LavaClient(object):
     def deploy_linaro_kernel(self, kernel, ramdisk, dtb, modules, rootfs,
                              nfsrootfs, bootloader, firmware, bl1, bl2, bl31,
                              rootfstype, bootloadertype, target_type):
-        self.target_device.deploy_linaro_kernel(kernel, ramdisk, dtb, modules, rootfs,
-                                                nfsrootfs, bootloader, firmware,
-                                                bl1, bl2, bl31, rootfstype,
-                                                bootloadertype, target_type)
+        self.target_device.deploy_linaro_kernel(
+            kernel, ramdisk, dtb, modules, rootfs,
+            nfsrootfs, bootloader, firmware,
+            bl1, bl2, bl31, rootfstype,
+            bootloadertype, target_type
+        )
 
     def nexell_reset_or_reboot(self):
         self.target_device.nexell_reset_or_reboot()
 
     def nexell_deploy_image(self, interface, image):
-        self.target_device.nexell_deploy_image(interface=interface, image=image)
+        self.target_device.nexell_deploy_image(
+            interface=interface, image=image
+        )
+
+    def nexell_boot_image(self, params):
+        self.target_device.nexell_boot_image(params)
 
     @contextlib.contextmanager
     def runner(self):

@@ -1,9 +1,10 @@
 import logging
-#import contextlib
+import contextlib
 import subprocess
 import re
 import time
 import glob
+import os
 
 from lava_dispatcher.device.bootloader import (
     BootloaderTarget,
@@ -14,7 +15,7 @@ from lava_dispatcher.errors import (
 from lava_dispatcher.downloader import (
     download_image,
 )
-#from lava_dispatcher import deployment_data
+from lava_dispatcher import deployment_data
 
 from pexpect import TIMEOUT
 
@@ -24,31 +25,39 @@ class NexellTarget(BootloaderTarget):
     def __init__(self, context, config):
         super(NexellTarget, self).__init__(context, config)
         self._usb_device_id = None
+        self._master_ps1_pattern = None
+        # overriding
+        self._scratch_dir = "/tmp"
+        self._boot_type = None
 
     def nexell_reset_or_reboot(self):
         # after this command, board state is u-boot command line
         logging.debug("start command nexell_reset_or_reboot")
         print("nexell_reset_or_reboot start...")
+        self.proc.sendcontrol('c')
         self.proc.sendline("reboot")
         print("end of sendline reboot")
         index =\
             self.proc.expect(
-                ["Hit any key to stop", "- try 'help'", TIMEOUT], timeout=5)
+                ["Hit any key to stop", "nxp4330#", "nxp5430#", "- try 'help'", TIMEOUT], timeout=5)
         print("expect result %d" % index)
-        if index == 0:
+        if index < 3:
             print("succeed to reboot")
             self.proc.sendline("\n")
-        elif index == 1:
+        else:
             print("send reset command for bootloader")
+            #time.sleep(1)
             self.proc.sendline("reset")
             index =\
-                self.proc.expect(["Hit any key to stop", TIMEOUT], timeout=5)
-            if index == 0:
+                self.proc.expect(["Hit any key to stop", "nxp4330#", "nxp5430#", TIMEOUT], timeout=5)
+            if index < 3:
                 print("succeed to reset")
                 self.proc.sendline("\n")
             else:
                 print("board state is unknown")
                 raise CriticalError("Unknown Board State!!!")
+
+        time.sleep(1)
 
     def _check_host_fastboot(self):
         #sudo apt-get install android-tools-fastboot
@@ -180,6 +189,110 @@ class NexellTarget(BootloaderTarget):
             self.proc.sendline("\n")
             self._clear_uboot_env()
             time.sleep(1)
+
+    def _check_boot_image_args(self, params):
+        print(params.keys())
+        if 'type' not in params.keys():
+            raise CriticalError("You should add type parameter!")
+        if 'check_msg' not in params.keys():
+            raise CriticalError("You should add check_msg parameter!")
+        if 'timeout' not in params.keys():
+            raise CriticalError("You should add timeout parameter!")
+
+    def _boot_raw_image(self, params):
+        if 'commands' in params.keys():
+            for command in params['commands']:
+                print("set commands: " + command)
+                self.proc.sendline(command)
+        else:
+            print("pass commands setting")
+
+    def _check_android_logcat_msg(self, logcat_msg, timeout):
+        print("_check_android_logcat_msg: %s, %d" % (logcat_msg, timeout))
+        self.proc.sendline("\n")
+        self.proc.sendline("\n")
+        self.proc.sendline("\n")
+        time.sleep(1)
+        self.proc.sendline("logcat")
+        index = self.proc.expect([logcat_msg, TIMEOUT], timeout=timeout)
+        if index != 0:
+            raise CriticalError("Timeout for android booting")
+        self.proc.sendcontrol('c')
+        self.proc.sendcontrol('c')
+
+        print("Complete check android booting")
+
+    def nexell_boot_image(self, params):
+        print("nexell_boot_image")
+        self._check_boot_image_args(params)
+        self.nexell_reset_or_reboot()
+
+        if params['type'] in ['raw', 'android']:
+            self._boot_raw_image(params)
+
+        self.proc.sendline("boot")
+        time.sleep(1)
+        index = self.proc.expect([params['check_msg'], TIMEOUT], timeout=int(params['timeout']))
+        if index != 0:
+            raise CriticalError("Timeout for booting")
+
+        if params['type'] == 'android':
+            if 'logcat_check_msg' in params.keys() and 'logcat_check_timeout' in params.keys():
+                self._check_android_logcat_msg(params['logcat_check_msg'], int(params['logcat_check_timeout']))
+            self.deployment_data = deployment_data.nexell_android
+            self._boot_type = 'android'
+            product = self.context.job_data['target'].split('-')[0]
+            # self.deployment_data['TESTER_PS1'] = "root@{}:/ #".format(product)
+            # self.deployment_data['TESTER_PS1_PATTERN'] = "root@{}:/ #".format(product)
+            # print("TESTER_PS1: " + self.deployment_data['TESTER_PS1'])
+            self.MASTER_PS1_PATTTERN = "root@{}:/ #".format(product)
+            self._master_ps1_pattern = "root@{}:/ #".format(product)
+            print("self.MASTER_PS1_PATTERN: %s, _master_ps1_pattern: %s" %
+                (self.MASTER_PS1_PATTERN, self._master_ps1_pattern))
+
+    # overriding
+    @contextlib.contextmanager
+    def file_system(self, partition, directory):
+        logging.info('attempting to access master filesystem %r:%s',
+                     partition, directory)
+        # yield self.deployment_data['lava_test_dir']
+        yield '/tmp/lava'
+
+    def _push_files_to_target(self, host_dir, target_dir):
+        files = os.listdir(host_dir)
+        self.proc.sendline("mkdir -p %s" % target_dir)
+        self.proc.sendline("chmod -R 777 %s" % target_dir)
+        for f in files:
+            full = host_dir + '/' + f
+            if os.path.isdir(full):
+                dest_dir = target_dir + '/' + os.path.basename(full)
+                self._push_files_to_target(full, dest_dir)
+            else:
+                subprocess.call(["adb", "-s", self.config.adb_serialno, "push", full, target_dir])
+
+    def power_on(self):
+        logging.info("NexellTarget::power_on()")
+        output = subprocess.check_output(["pwd"], stderr=subprocess.STDOUT)
+        logging.info("current dir: %s" % output)
+        # install lava_test_shells
+        target_dir = "/data/lava-%s" % self.context.job_data['target']
+        self.proc.sendline("mkdir -p %s" % target_dir)
+        self.proc.sendline("chmod -R 777 %s" % target_dir)
+
+        prefix = "/tmp/lava"
+        push_files = os.listdir(prefix)
+
+        try:
+            subprocess.call(['adb', 'devices'])
+        except:
+            subprocess.call(['apt-get', 'install', '--yes', 'android-tools-adb'])
+
+        print("adb_serialno: %s" % self.config.adb_serialno)
+
+        self._push_files_to_target(prefix, target_dir)
+
+        self.proc.sendline("chmod -R 777 %s/bin" % target_dir)
+        return self.proc
 
 
 target_class = NexellTarget

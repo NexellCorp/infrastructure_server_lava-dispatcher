@@ -170,6 +170,11 @@ def _get_lava_proxy(context):
 def _get_testdef_git_repo(testdef_repo, tmpdir, revision, proxy_env):
     cwd = os.getcwd()
     gitdir = os.path.join(tmpdir, 'gittestrepo')
+    # psw0523 add
+    if os.path.isdir(gitdir):
+        import shutil
+        shutil.rmtree(gitdir)
+    # end psw0523
     try:
         subprocess.check_call(['git', 'clone', testdef_repo, gitdir],
                               env=proxy_env)
@@ -206,6 +211,7 @@ def _get_testdef_tar_repo(testdef_repo, tmpdir):
     """Extracts the provided encoded tar archive into tmpdir."""
     tardir = os.path.join(tmpdir, 'tartestrepo')
     temp_tar = os.path.join(tmpdir, "tar-repo.tar")
+    #print("tardir: %s, temp_tar %s" % (tardir, temp_tar))
 
     try:
         if not os.path.isdir(tardir):
@@ -332,7 +338,10 @@ class TestDefinitionLoader(object):
                                                testdef_metadata))
 
     def load_from_repo(self, testdef_repo):
-        tmpdir = utils.mkdtemp(self.tmpbase)
+        # psw0523 fix
+        # tmpdir = utils.mkdtemp(self.tmpbase)
+        tmpdir = self.tmpbase
+        #print("load_from_repo: tmpdir %s" % tmpdir)
         repo = None
         info = None
         if 'git-repo' in testdef_repo:
