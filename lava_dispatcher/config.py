@@ -281,6 +281,9 @@ class DeviceSchema(schema.Schema):
     dynamic_vm_backend_device_type = schema.StringOption(default='kvm')
     dynamic_vm_host = schema.StringOption(default=None)
 
+    # for nexell
+    adb_serialno = schema.StringOption(default=None)
+
 
 class OptionDescriptor(object):
     def __init__(self, name):
