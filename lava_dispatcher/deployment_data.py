@@ -130,3 +130,18 @@ fedora = deployment_data_dict({
     'lava_test_results_part_attr': 'root_part',
     'lava_test_results_dir': '/lava-%s',
 })
+
+nexell_android = deployment_data_dict({
+    'TESTER_PS1': "root@linaro# ",
+    'TESTER_PS1_PATTERN': "root@(\w+):/ # ",
+    'TESTER_PS1_INCLUDES_RC': False,
+    #'boot_cmds': 'boot_cmds_android',
+
+    # for lava-test-shell
+    'distro': 'android',
+    'lava_test_sh_cmd': '/system/bin/sh',
+    'lava_test_dir': '/data/lava-%s',
+    'lava_test_results_part_attr': 'data_part_android_org',
+    'lava_test_results_dir': '/lava-%s',
+})
+
