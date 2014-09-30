@@ -137,22 +137,28 @@ class DeviceSchema(schema.Schema):
 
     # for the HDMI module of LMP
     lmp_hdmi_id = schema.DictOption()
+    lmp_hdmi_defconf = schema.DictOption(default=None)
     lmp_hdmi_version = schema.StringOption(default="unknown")
 
     # for the SATA module of LMP
     lmp_sata_id = schema.DictOption()
+    lmp_sata_defconf = schema.DictOption(default=None)
     lmp_sata_version = schema.StringOption(default="unknown")
 
     # for the ETH module of LMP
     lmp_eth_id = schema.DictOption()
+    lmp_eth_defconf = schema.DictOption(default=None)
     lmp_eth_version = schema.StringOption(default="unknown")
 
     # for the LSGPIO module of LMP
     lmp_lsgpio_id = schema.DictOption()
+    lmp_lsgpio_defconf = schema.DictOption(default=None)
+    lmp_audio_defconf = schema.DictOption(default=None)
     lmp_lsgpio_version = schema.StringOption(default="unknown")
 
     # for the USB module of LMP
     lmp_usb_id = schema.DictOption()
+    lmp_usb_defconf = schema.DictOption(default=None)
     lmp_usb_version = schema.StringOption(default="unknown")
 
     # auto image login
@@ -161,25 +167,6 @@ class DeviceSchema(schema.Schema):
     username = schema.StringOption(default=None)
     password = schema.StringOption(default=None)
     login_commands = schema.ListOption(default=None)
-
-    simulator_version_command = schema.StringOption()
-    simulator_command = schema.StringOption()
-    simulator_command_flag = schema.StringOption(default=" -C ")
-    simulator_axf_files = schema.ListOption()
-    simulator_kernel_files = schema.ListOption(default=None)
-    simulator_kernel = schema.StringOption(default=None)
-    simulator_initrd_files = schema.ListOption(default=None)
-    simulator_initrd = schema.StringOption(default=None)
-    simulator_dtb_files = schema.ListOption(default=None)
-    simulator_dtb = schema.StringOption(default=None)
-    simulator_uefi_files = schema.ListOption(default=None)
-    simulator_bl1_files = schema.ListOption(default=None)
-    simulator_bl1 = schema.StringOption(default=None)
-    simulator_bl2_files = schema.ListOption(default=None)
-    simulator_bl2 = schema.StringOption(default=None)
-    simulator_bl31_files = schema.ListOption(default=None)
-    simulator_bl31 = schema.StringOption(default=None)
-    simulator_boot_wrapper = schema.StringOption(default=None)
 
     android_disable_suspend = schema.BoolOption(default=True)
     android_adb_over_usb = schema.BoolOption(default=False)
@@ -194,33 +181,13 @@ class DeviceSchema(schema.Schema):
     android_lava_block_device = schema.StringOption(default="mmcblk0")
     partition_padding_string_org = schema.StringOption(default="p")
     partition_padding_string_android = schema.StringOption(default="p")
+    android_serialno_patterns = schema.ListOption(default=['[0-9A-Fa-f]{16}'])
 
     arm_probe_binary = schema.StringOption(default='/usr/local/bin/arm-probe')
     arm_probe_config = schema.StringOption(default='/usr/local/etc/arm-probe-config')
     arm_probe_channels = schema.ListOption(default=['VDD_VCORE1'])
 
-    uefi_image_filename = schema.StringOption(default=None)
     customize = schema.DictOption(default=None)
-    vexpress_uefi_path = schema.StringOption(default=None)
-    vexpress_uefi_backup_path = schema.StringOption(default=None)
-    vexpress_stop_autoboot_prompt = schema.StringOption(
-        default='Press Enter to stop auto boot...')
-    vexpress_usb_mass_storage_device = schema.StringOption(default=None)
-
-    bl1_image_files = schema.ListOption(default=None)
-    bl1_image_filename = schema.StringOption(default="bl1.bin")
-    fip_image_files = schema.ListOption(default=None)
-    fip_image_filename = schema.StringOption(default="fip.bin")
-
-    wg_bl1_path = schema.StringOption(default="SOFTWARE/bl1.bin")
-    wg_fip_path = schema.StringOption(default="SOFTWARE/fip.bin")
-
-    wg_bl1_backup_path = schema.StringOption(default="SOFTWARE/backup-bl1.bin")
-    wg_fip_backup_path = schema.StringOption(default="SOFTWARE/backup-fip.bin")
-
-    wg_usb_mass_storage_device = schema.StringOption(default="/dev/disk/by-label/WG")
-    wg_stop_autoboot_prompt = schema.StringOption(
-        default='Press Enter to stop auto boot...')
 
     ecmeip = schema.StringOption()
     ipmi_power_sleep = schema.IntOption(default=1)
@@ -239,6 +206,27 @@ class DeviceSchema(schema.Schema):
     master_username = schema.StringOption(default=None)
     master_password = schema.StringOption(default=None)
     master_login_commands = schema.ListOption(default=None)
+
+    # for fastmodel devices
+    simulator_version_command = schema.StringOption()
+    simulator_command = schema.StringOption()
+    simulator_command_flag = schema.StringOption(default=" -C ")
+    simulator_axf_files = schema.ListOption()
+    simulator_kernel_files = schema.ListOption(default=None)
+    simulator_kernel = schema.StringOption(default=None)
+    simulator_initrd_files = schema.ListOption(default=None)
+    simulator_initrd = schema.StringOption(default=None)
+    simulator_dtb_files = schema.ListOption(default=None)
+    simulator_dtb = schema.StringOption(default=None)
+    simulator_uefi_files = schema.ListOption(default=None)
+    simulator_uefi_vars = schema.StringOption(default="uefi-vars.fd")
+    simulator_bl1_files = schema.ListOption(default=None)
+    simulator_bl1 = schema.StringOption(default=None)
+    simulator_bl2_files = schema.ListOption(default=None)
+    simulator_bl2 = schema.StringOption(default=None)
+    simulator_bl31_files = schema.ListOption(default=None)
+    simulator_bl31 = schema.StringOption(default=None)
+    simulator_boot_wrapper = schema.StringOption(default=None)
 
     # for dummy devices
     dummy_driver = schema.StringOption(default=None)
@@ -276,6 +264,9 @@ class DeviceSchema(schema.Schema):
     alternative_dir = schema.StringOption(default=None)
     u_load_addrs = schema.ListOption(default=None)
     z_load_addrs = schema.ListOption(default=None)
+    uimage_only = schema.BoolOption(default=False)
+    uimage_xip = schema.BoolOption(default=False)
+    append_dtb = schema.BoolOption(default=False)
 
     # for dynamic_vm devices
     dynamic_vm_backend_device_type = schema.StringOption(default='kvm')
@@ -283,6 +274,21 @@ class DeviceSchema(schema.Schema):
 
     # for nexell
     adb_serialno = schema.StringOption(default=None)
+
+    # for vexpress devices
+    vexpress_uefi_default = schema.StringOption(default=None)
+    vexpress_bl1_default = schema.StringOption(default=None)
+    vexpress_uefi_path = schema.StringOption(default=None)
+    vexpress_uefi_image_files = schema.ListOption(default=None)
+    vexpress_uefi_image_filename = schema.StringOption(default="fip.bin")
+    vexpress_uefi_backup_path = schema.StringOption(default=None)
+    vexpress_bl1_path = schema.StringOption(default=None)
+    vexpress_bl1_image_files = schema.ListOption(default=None)
+    vexpress_bl1_image_filename = schema.StringOption(default="bl1.bin")
+    vexpress_bl1_backup_path = schema.StringOption(default=None)
+    vexpress_stop_autoboot_prompt = schema.StringOption(default='Press Enter to stop auto boot...')
+    vexpress_usb_mass_storage_device = schema.StringOption(default=None)
+    vexpress_requires_trusted_firmware = schema.BoolOption(default=False)
 
 
 class OptionDescriptor(object):

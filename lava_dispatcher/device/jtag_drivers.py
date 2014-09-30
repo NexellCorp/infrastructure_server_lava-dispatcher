@@ -73,6 +73,7 @@ class stmc(BaseDriver):
                              bootloader, firmware, bl1, bl2, bl31, rootfstype,
                              bootloadertype, target_type, scratch_dir):
         kernel_url = kernel
+        dtb_url = dtb
         # At a minimum we must have a kernel
         if kernel is None:
             raise CriticalError("No kernel image to boot")
@@ -131,6 +132,7 @@ class stmc(BaseDriver):
             logging.info("Sending the kernel, dtb, nfsrootfs urls")
             self.context.transport.request_send('lava_ms_slave_data',
                                                 {'kernel': kernel_url,
+                                                 'dtb': dtb_url if dtb_url else '',
                                                  'nfs_rootfs': lava_nfsrootfs,
                                                  'nfs_server_ip': self.context.config.lava_server_ip,
                                                  'stmc_ip': self.config.jtag_stmc_ip})
@@ -204,16 +206,16 @@ class stmc(BaseDriver):
                 if not success:
                     raise CriticalError("The STMC fails to reboot after hard reset")
 
-                # Setup the serial-relay
-                if not self.stmc_serial_relay():
-                    raise CriticalError("Unable to setup the serial relay. The STMC is not working properly")
-
             # Hard reset platform
             if self.config.hard_reset_command:
                 logging.info("Hard resetting platform")
                 self.context.run_command(self.config.hard_reset_command)
             else:
                 raise CriticalError("Must have a hard_reset_command defined")
+
+            # Setup the serial-relay
+            if not self.stmc_serial_relay():
+                raise CriticalError("Unable to setup the serial relay. The STMC is not working properly")
 
             # Connect to the STMC serial relay
             logging.info("Connecting to STMC serial relay")
