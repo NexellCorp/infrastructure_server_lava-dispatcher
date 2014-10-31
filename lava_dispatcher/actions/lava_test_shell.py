@@ -500,6 +500,7 @@ class URLTestDefinition(object):
 
     def _create_repos(self, testdir):
         cwd = os.getcwd()
+        logging.info("cwd: %s, testdir: %s" % (cwd, testdir))
         try:
             os.chdir(testdir)
 
@@ -531,17 +532,23 @@ class URLTestDefinition(object):
     def _inject_testdef_parameters(self, fout):
         # inject default parameters that was defined in yaml first
         fout.write('###default parameters from yaml###\n')
+        logging.info("###default parameters from yaml###")
         if 'params' in self.testdef:
             for def_param_name, def_param_value in self.testdef['params'].items():
+                logging.info("%s=%s" % (def_param_name, def_param_value))
                 fout.write('%s=\'%s\'\n' % (def_param_name, def_param_value))
+        logging.info('######')
         fout.write('######\n')
         # inject the parameters that was set in json
+        logging.info('###test parameters from json###')
         fout.write('###test parameters from json###\n')
         if self._sw_sources and 'test_params' in self._sw_sources[0] and self._sw_sources[0]['test_params'] != '':
             _test_params_temp = eval(self._sw_sources[0]['test_params'])
             for param_name, param_value in _test_params_temp.items():
                 fout.write('%s=\'%s\'\n' % (param_name, param_value))
+                logging.info('%s=%s' % (param_name, param_value))
         fout.write('######\n')
+        logging.info('######')
 
     def _create_target_install(self, hostdir, targetdir):
         with open('%s/install.sh' % hostdir, 'w') as f:
@@ -587,13 +594,91 @@ class URLTestDefinition(object):
                     for cmd in steps:
                         f.write('%s\n' % cmd)
 
-    def copy_test(self, hostdir, targetdir):
+    def get_real_test_name(self):
+        if self._sw_sources and 'test_params' in self._sw_sources[0] and self._sw_sources[0]['test_params'] != '':
+            _test_params_temp = eval(self._sw_sources[0]['test_params'])
+            if 'TEST_NAME' in _test_params_temp.keys():
+                return _test_params_temp['TEST_NAME']
+        return None 
+
+    def run_on_host(self):
+        """
+        run commands on host machine
+        """
+        #setting path
+        # os.environ['PATH'] = os.environ['PATH'] + ":/tmp/lava/bin"
+        logging.info("run_on_host() ==> cwd: %s" % os.getcwd())
+
+        steps = self.testdef['run'].get('steps', [])
+        real_cmds = None
+        for step in steps:
+            logging.info("run step: %s" % step)
+            real_cmds = step
+            if "$TEST_NAME" in step: 
+                # if self._sw_sources and 'test_params' in self._sw_sources[0] and self._sw_sources[0]['test_params'] != '':
+                #     _test_params_temp = eval(self._sw_sources[0]['test_params'])
+                #     if 'TEST_NAME' in _test_params_temp.keys():
+                #         real_test_name = _test_params_temp['TEST_NAME']
+                #         logging.info("real_test_name: %s" % real_test_name)
+                #         real_cmds = step.replace("$TEST_NAME", real_test_name)
+                #         logging.info("real_cmds: %s" % real_cmds)
+                real_test_name = self.get_real_test_name()
+                if real_test_name:
+                    logging.info("real_test_name: %s" % real_test_name)
+                    real_cmds = step.replace("$TEST_NAME", real_test_name)
+                    logging.info("real_cmds: %s" % real_cmds)
+
+            cmd_list = real_cmds.split()
+            if cmd_list[0] == "cd":
+                logging.info("chdir %s" % cmd_list[1])
+                os.chdir(cmd_list[1])
+            else:
+                print("current dir: %s" % os.getcwd())
+                subprocess.call(cmd_list)
+
+    def _install_host(self, hostdir):
+        """
+        install in host machine
+        """
+        if self.skip_install != 'deps':
+            deps = self.testdef['install'].get('deps', [])
+
+            if deps:
+                for dep in deps:
+                    #install_cmds = "apt-get install %s " % dep.split()
+                    install_cmds = "apt-get install --yes %s" % dep
+                    logging.info("call %s" % install_cmds)
+                    subprocess.call(install_cmds.split())
+
+        if self.skip_install != 'steps':
+            os.chdir(hostdir)
+            logging.info("cwd: %s" % os.getcwd())
+            steps = self.testdef['install'].get('steps', [])
+            print steps
+            if steps:
+                oldpwd = None
+                for cmd in steps:
+                    install_cmds = cmd.split()
+                    if install_cmds[0] == "cd":
+                        oldpwd = os.getcwd()
+                        logging.info("chdir %s" % install_cmds[1])
+                        os.chdir(install_cmds[1])
+                    else:
+                        logging.info("call %s" % cmd)
+                        subprocess.call(install_cmds)
+                        os.chdir(oldpwd)
+
+        os.chdir(hostdir)
+
+    def copy_test(self, hostdir, targetdir, role=None):
         """Copy the files needed to run this test to the device.
 
         :param hostdir: The location on the device filesystem to copy too.
         :param targetdir: The location `hostdir` will have when the device
             boots.
         """
+
+        logging.info("copy_test: hostdir %s, targetdir %s, role %s" % (hostdir, targetdir, role))
         utils.ensure_directory(hostdir)
         with open('%s/testdef.yaml' % hostdir, 'w') as f:
             f.write(yaml.dump(self.testdef))
@@ -608,7 +693,10 @@ class URLTestDefinition(object):
             if 'install' in self.testdef:
                 if self.skip_install != 'repos':
                     self._create_repos(hostdir)
-                self._create_target_install(hostdir, targetdir)
+                if role == "host":
+                    self._install_host(hostdir)
+                else:
+                    self._create_target_install(hostdir, targetdir)
 
         with open('%s/run.sh' % hostdir, 'w') as f:
             self._inject_testdef_parameters(f)
@@ -684,9 +772,9 @@ class RepoTestDefinition(URLTestDefinition):
         self.repo = repo
         self._sw_sources.append(info)
 
-    def copy_test(self, hostdir, targetdir):
+    def copy_test(self, hostdir, targetdir, role=None):
         shutil.copytree(self.repo, hostdir, symlinks=True)
-        URLTestDefinition.copy_test(self, hostdir, targetdir)
+        URLTestDefinition.copy_test(self, hostdir, targetdir, role)
         logging.info('copied all test files')
 
 
@@ -738,10 +826,18 @@ class cmd_lava_test_shell(BaseAction):
             'test_runs': self._test_runs,
             'format': 'Dashboard Bundle Format 1.7',
         }
+        # psw0523 add
+        self._role = None
 
-    def run(self, testdef_urls=None, testdef_repos=None, timeout=-1, skip_install=None,
+    def run(self, role=None, testdef_urls=None, testdef_repos=None, timeout=-1, skip_install=None,
             lava_test_dir=None, lava_test_results_dir=None):
         target = self.client.target_device
+
+        # psw0523 debugging
+        logging.info("lava_test_shell run role %s, testdef_repos %s" % (role, testdef_repos))
+        if role:
+            self._role = role
+        # end psw0523
 
         delay = target.config.test_shell_serial_delay_ms
 
@@ -757,23 +853,30 @@ class cmd_lava_test_shell(BaseAction):
         signal_director = SignalDirector(self.client, testdef_objs,
                                          self.context)
 
-        with self.client.runner() as runner:
-            if self.context.config.lava_proxy:
+        if role == "host":
+            logging.info("This is host testdef")
+            for testdef in testdef_objs:
+                testdef.run_on_host()
+            #return
+        else:
+            logging.info("This is not host testdef: role is %s" % role)
+            with self.client.runner() as runner:
+                if self.context.config.lava_proxy:
+                    runner._connection.sendline(
+                        "export http_proxy=%s" % self.context.config.lava_proxy, delay)
                 runner._connection.sendline(
-                    "export http_proxy=%s" % self.context.config.lava_proxy, delay)
-            runner._connection.sendline(
-                "%s/bin/lava-test-runner %s" % (
-                    target.lava_test_dir,
-                    target.lava_test_dir),
-                delay)
-            start = time.time()
-            if timeout == -1:
-                timeout = runner._connection.timeout
-            initial_timeout = timeout
-            signal_director.set_connection(runner._connection)
-            while self._keep_running(runner, target, timeout, signal_director):
-                elapsed = time.time() - start
-                timeout = int(initial_timeout - elapsed)
+                    "%s/bin/lava-test-runner %s" % (
+                        target.lava_test_dir,
+                        target.lava_test_dir),
+                    delay)
+                start = time.time()
+                if timeout == -1:
+                    timeout = runner._connection.timeout
+                initial_timeout = timeout
+                signal_director.set_connection(runner._connection)
+                while self._keep_running(runner, target, timeout, signal_director):
+                    elapsed = time.time() - start
+                    timeout = int(initial_timeout - elapsed)
 
         self._bundle_results(target, signal_director, testdef_objs)
 
@@ -873,7 +976,26 @@ class cmd_lava_test_shell(BaseAction):
         return False
 
     def _copy_runner(self, mntdir, target):
-        shell = target.deployment_data['lava_test_sh_cmd']
+        # psw0523 patch for role -> host
+        logging.info("===> _copy_runner")
+        if self._role == "host":
+            shell = "/bin/bash"
+            # setting PATH
+            path = os.environ['PATH']
+            new_path = "%s/bin" % mntdir
+            if new_path not in path:
+                os.environ['PATH'] = "%s:%s" % (path, new_path)
+                logging.info("set PATH variable: %s" % os.environ['PATH'])
+            try:
+                logging.info("LAVA_RESULT_DIR: %s" % os.environ['LAVA_RESULT_DIR'])
+            except KeyError:
+                logging.info("LAVA_RESULT_DIR is not set")
+                host_result_dir = self.context.host_result_dir
+                os.environ['LAVA_RESULT_DIR'] = host_result_dir
+                logging.info("set LAVA_RESULT_DIR ==> %s" % host_result_dir)
+
+        else:
+            shell = target.deployment_data['lava_test_sh_cmd']
 
         # Generic scripts
         scripts_to_copy = glob(os.path.join(LAVA_TEST_DIR, 'lava-*'))
@@ -983,7 +1105,7 @@ class cmd_lava_test_shell(BaseAction):
                 hdir = '%s/tests/%s' % (d, testdef.dirname)
                 tdir = '%s/tests/%s' % (target.lava_test_dir,
                                         testdef.dirname)
-                testdef.copy_test(hdir, tdir)
+                testdef.copy_test(hdir, tdir, self._role)
                 tdirs.append(tdir)
 
             with open('%s/lava-test-runner.conf' % d, 'w') as f:
@@ -1000,6 +1122,9 @@ class cmd_lava_test_shell(BaseAction):
         rdir = self.context.host_result_dir
         parse_err_msg = None
 
+        # psw0523 debugging
+        logging.info("_bundle_results: %s, %s" % (results_part, rdir))
+
         filesystem_access_failure = True
 
         try:
@@ -1007,7 +1132,18 @@ class cmd_lava_test_shell(BaseAction):
                 filesystem_access_failure = False
                 err_log = os.path.join(d, 'parse_err.log')
                 results_dir = os.path.join(d, 'results')
-                bundle = lava_test_shell.get_bundle(results_dir, testdef_objs, err_log)
+                # psw0523 debugging
+                logging.info("results_dir: %s" % results_dir)
+                # psw0523 patch
+                if self._role == "host":
+                    bundle = lava_test_shell.get_bundle_host(
+                                                    results_dir,
+                                                    testdef_objs,
+                                                    err_log,
+                                                    testdef_objs[0].get_real_test_name())
+                else:
+                    bundle = lava_test_shell.get_bundle(results_dir, testdef_objs, err_log)
+                print bundle
                 parse_err_msg = read_content(err_log, ignore_missing=True)
                 if os.path.isfile(err_log):
                     os.unlink(err_log)
@@ -1032,7 +1168,9 @@ class cmd_lava_test_shell(BaseAction):
             else:
                 raise e
 
-        signal_director.postprocess_bundle(bundle)
+        # psw0523 patch
+        if self._role != "host":
+            signal_director.postprocess_bundle(bundle)
 
         (fd, name) = tempfile.mkstemp(
             prefix='lava-test-shell', suffix='.bundle', dir=rdir)
@@ -1049,7 +1187,9 @@ class cmd_lava_test_shell(BaseAction):
         test_id = params[0]
         testdef = self._testdefs_by_name[test_id]
 
-        now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+        # psw0523 patch
+        # now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+        now = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
         test_run = {
             'test_id': testdef.test_id,
             'analyzer_assigned_date': now,

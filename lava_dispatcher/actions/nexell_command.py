@@ -53,6 +53,8 @@ class cmd_nexell_boot_image(BaseAction):
             'bootargs': {'type': 'string', 'optional': True},
             'logcat_check_msg': {'type': 'string', 'optional': True},
             'logcat_check_timeout': {'type': 'string'},
+            'input_event': {'type': 'array', 'items': {'type': 'string'},
+                             'optional': True}
         },
         'additionalProperties': False,
     }
@@ -63,3 +65,23 @@ class cmd_nexell_boot_image(BaseAction):
 
     def run(self, **params):
         self.client.nexell_boot_image(params=params)
+
+
+class cmd_nexell_android_ready_working(BaseAction):
+
+    parameters_schema = {
+        'type': 'object',
+        'properties': {
+            'display_on_command': {'type': 'string'},
+            'input_event': {'type': 'array', 'items': {'type': 'string'},
+                             'optional': True}
+        },
+        'additionalProperties': False,
+    }
+
+    @classmethod
+    def validate_parameters(cls, parameters):
+        super(cmd_nexell_android_ready_working, cls).validate_parameters(parameters)
+
+    def run(self, **params):
+        self.client.nexell_android_ready_working(params=params)

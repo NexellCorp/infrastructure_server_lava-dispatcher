@@ -118,7 +118,9 @@ class cmd_lava_command_run(BaseAction):
         return results_from_log_file
 
     def _get_test_runs(self):
-        now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+        # psw0523 patch
+        # now = datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+        now = datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
         attachment = [create_attachment(os.path.basename(self._logfile), read_content(self._logfile))]
         results = self._get_test_results()
         return {

@@ -123,8 +123,11 @@ class LavaContext(object):
     @property
     def host_result_dir(self):
         if self._host_result_dir is None:
-            self._host_result_dir = tempfile.mkdtemp()
-            atexit.register(rmtree, self._host_result_dir)
+            # psw0523 test
+            # self._host_result_dir = tempfile.mkdtemp()
+            self._host_result_dir = "/tmp/lava/results"
+            # psw0523 patch for nexell submit result
+            #atexit.register(rmtree, self._host_result_dir)
         return self._host_result_dir
 
     def get_device_version(self):

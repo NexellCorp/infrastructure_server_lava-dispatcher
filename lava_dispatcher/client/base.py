@@ -420,6 +420,9 @@ class LavaClient(object):
     def nexell_boot_image(self, params):
         self.target_device.nexell_boot_image(params)
 
+    def nexell_android_ready_working(self, params):
+        self.target_device.nexell_android_ready_working(params)
+
     @contextlib.contextmanager
     def runner(self):
         """

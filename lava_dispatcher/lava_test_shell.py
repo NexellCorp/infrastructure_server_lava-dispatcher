@@ -266,6 +266,8 @@ def _get_test_results(test_run_dir, testdef, stdout, err_log):
     pattern = None
     pattern_used = None
 
+    logging.info("stdout: %s" % stdout)
+
     if 'parse' in testdef:
         if 'fixupdict' in testdef['parse']:
             fixupdict.update(testdef['parse']['fixupdict'])
@@ -300,6 +302,7 @@ def _get_test_results(test_run_dir, testdef, stdout, err_log):
     for lineno, line in enumerate(stdout.split('\n'), 1):
         match = pattern.match(line.strip())
         if match:
+            logging.info("pattern matched")
             res = parse_testcase_result(match.groupdict(), fixupdict)
             # Both of 'test_case_id' and 'result' must be included
             if 'test_case_id' not in res or 'result' not in res:
@@ -314,6 +317,7 @@ def _get_test_results(test_run_dir, testdef, stdout, err_log):
         # Locate a simple lava-test-case with result to retrieve log line no
         match = result_pattern.match(line.strip())
         if match:
+            logging.info("result_pattern matched")
             res = parse_testcase_result(match.groupdict(), fixupdict)
             res['log_lineno'] = lineno
             res['log_filename'] = 'stdout.log'
@@ -322,10 +326,13 @@ def _get_test_results(test_run_dir, testdef, stdout, err_log):
         # also catch a lava-test-case with a unit and a measurement
         match = test_case_pattern.match(line.strip())
         if match:
+            logging.info("test_case_pattern matched")
             res = parse_testcase_result(match.groupdict(), fixupdict)
             res['log_lineno'] = lineno
             res['log_filename'] = 'stdout.log'
             results_from_log_file.append(res)
+
+    print results_from_log_file
 
     results_from_directories = []
     results_from_directories_by_id = {}
@@ -354,6 +361,107 @@ def _get_test_results(test_run_dir, testdef, stdout, err_log):
 
     return results_from_log_file
 
+
+def _get_test_results_host(test_run_dir, testdef, stdout, err_log):
+    results_from_log_file = []
+    fixupdict = {'PASS': 'pass', 'FAIL': 'fail', 'SKIP': 'skip',
+                 'UNKNOWN': 'unknown'}
+    pattern = None
+    pattern_used = None
+
+    logging.info("stdout: %s" % stdout)
+
+    if 'parse' in testdef:
+        if 'fixupdict' in testdef['parse']:
+            fixupdict.update(testdef['parse']['fixupdict'])
+        if 'pattern' in testdef['parse']:
+            pattern_used = testdef['parse']['pattern']
+    else:
+        defpat = "(?P<test_case_id>.*-*)\\s+:\\s+(?P<result>(PASS|pass|FAIL|fail|SKIP|skip|UNKNOWN|unknown))"
+        pattern_used = defpat
+        logging.warning("""Using a default pattern to parse the test result. This may lead to empty test result in certain cases.""")
+
+    try:
+        pattern = re.compile(pattern_used)
+    except re.error as e:
+        errmsg = "Pattern '{0:s}' for test run '{1:s}' compile error ({2:s}). "
+        errmsg = errmsg.format(pattern_used, testdef['metadata']['name'], str(e))
+        write_content(err_log, errmsg)
+        return results_from_log_file
+
+    if not pattern:
+        logging.debug("No pattern set")
+
+    slim_pattern = "<LAVA_SIGNAL_TESTCASE TEST_CASE_ID=(?P<test_case_id>.*)\\s+"\
+                   "RESULT=(?P<result>(PASS|pass|FAIL|fail|SKIP|skip|UNKNOWN|unknown))>"
+
+    test_pattern = "<LAVA_SIGNAL_TESTCASE TEST_CASE_ID=(?P<test_case_id>.*)\\s+"\
+                   "RESULT=(?P<result>(PASS|pass|FAIL|fail|SKIP|skip|UNKNOWN|unknown))\\s"\
+                   "MEASUREMENT=(?P<measurement>.*)>"
+    test_case_pattern = re.compile(test_pattern)
+    result_pattern = re.compile(slim_pattern)
+
+    for lineno, line in enumerate(stdout.split('\n'), 1):
+        match = pattern.match(line.strip())
+        if match:
+            logging.info("pattern matched")
+            res = parse_testcase_result(match.groupdict(), fixupdict)
+            # Both of 'test_case_id' and 'result' must be included
+            if 'test_case_id' not in res or 'result' not in res:
+                errmsg = "Pattern '{0:s}' for test run '{1:s}' is missing test_case_id or result. "
+                errmsg = errmsg.format(pattern_used, testdef['metadata']['name'])
+                write_content(err_log, errmsg)
+                return results_from_log_file
+            res['log_lineno'] = lineno
+            res['log_filename'] = 'stdout.log'
+            results_from_log_file.append(res)
+            continue
+        # Locate a simple lava-test-case with result to retrieve log line no
+        match = result_pattern.match(line.strip())
+        if match:
+            logging.info("result_pattern matched")
+            res = parse_testcase_result(match.groupdict(), fixupdict)
+            res['log_lineno'] = lineno
+            res['log_filename'] = 'stdout.log'
+            results_from_log_file.append(res)
+            continue
+        # also catch a lava-test-case with a unit and a measurement
+        match = test_case_pattern.match(line.strip())
+        if match:
+            logging.info("test_case_pattern matched")
+            res = parse_testcase_result(match.groupdict(), fixupdict)
+            res['log_lineno'] = lineno
+            res['log_filename'] = 'stdout.log'
+            results_from_log_file.append(res)
+
+    print results_from_log_file
+    
+    results_from_directories = []
+    results_from_directories_by_id = {}
+
+    result_names_and_paths = _directory_names_and_paths(
+        os.path.join(test_run_dir, 'results'), ignore_missing=True)
+    result_names_and_paths = [
+        (name, path) for (name, path) in result_names_and_paths
+        if os.path.isdir(path)]
+    result_names_and_paths.sort(key=lambda (name, path): os.path.getmtime(path))
+
+    for name, path in result_names_and_paths:
+        r = _result_from_dir(path)
+        results_from_directories_by_id[name] = (r, len(results_from_directories))
+        results_from_directories.append(r)
+
+    for res in results_from_log_file:
+        if res.get('test_case_id') in results_from_directories_by_id:
+            dir_res, index = results_from_directories_by_id[res['test_case_id']]
+            results_from_directories[index] = None
+            _merge_results(res, dir_res)
+
+    for res in results_from_directories:
+        if res is not None:
+            results_from_log_file.append(res)
+
+    return results_from_log_file
 
 def _get_run_attachments(test_run_dir, testdef, stdout):
     attachments = [create_attachment('stdout.log', stdout),
@@ -405,7 +513,9 @@ def get_testdef_obj_with_uuid(testdef_objs, uuid):
 
 
 def _get_test_run(test_run_dir, hwcontext, build, pkginfo, testdef_objs, err_log):
-    now = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+    # psw0523 patch : time now!
+    # now = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+    now = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
 
     testdef = read_content(os.path.join(test_run_dir, 'testdef.yaml'))
     stdout = read_content(os.path.join(test_run_dir, 'stdout.log'))
@@ -437,6 +547,25 @@ def _get_test_run(test_run_dir, hwcontext, build, pkginfo, testdef_objs, err_log
         'testdef_metadata': _get_run_testdef_metadata(test_run_dir)
     }
 
+def _get_test_run_host(test_run_dir, testdef_objs, err_log, real_test_name=None):
+    from uuid import uuid4
+    # now = datetime.datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')
+    now = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ')
+    logging.info("_get_test_run_host: test_run_dir %s" % test_run_dir)
+    test_yaml_path = "/tmp/lava/tests/0_%s" % testdef_objs[0].testdef['metadata']['name']
+    testdef = read_content(os.path.join(test_yaml_path, 'testdef.yaml'))
+    testdef = yaml.safe_load(testdef)
+    stdout = read_content(os.path.join(test_run_dir, 'log'))
+    test_id = real_test_name
+    if test_id is None:
+        test_id = testdef.get('metadata').get('name')
+    return {
+        'test_id': test_id,
+        'analyzer_assigned_date': now,
+        'analyzer_assigned_uuid': str(uuid4()),
+        'time_check_performed': False,
+        'test_results': _get_test_results_host(test_run_dir, testdef, stdout, err_log)
+    }
 
 def _directory_names_and_paths(dirpath, ignore_missing=False):
     if not os.path.exists(dirpath) and ignore_missing:
@@ -464,6 +593,31 @@ def get_bundle(results_dir, testdef_objs, err_log):
         if os.path.isdir(test_run_path):
             try:
                 testruns.append(_get_test_run(test_run_path, hwctx, build, pkginfo, testdef_objs, err_log))
+            except KeyboardInterrupt:
+                raise KeyboardInterrupt
+            except:
+                logging.exception('error processing results for: %s', test_run_name)
+
+    return {'test_runs': testruns, 'format': 'Dashboard Bundle Format 1.7'}
+
+# psw0523 add for role host
+def get_bundle_host(results_dir, testdef_objs, err_log, real_test_name=None):
+    """
+    get_bundle() for role of host version
+    """
+    logging.info("get_bundle_host: results_dir %s" % results_dir)
+    print testdef_objs
+    if len(testdef_objs) > 0:
+        print testdef_objs[0].testdef
+
+    testruns = []
+
+    # psw0523 check this!!!
+    # results_dir = "%s/results" % results_dir
+    for test_run_name, test_run_path in _directory_names_and_paths(results_dir):
+        if os.path.isdir(test_run_path):
+            try:
+                testruns.append(_get_test_run_host(test_run_path, testdef_objs, err_log, real_test_name))
             except KeyboardInterrupt:
                 raise KeyboardInterrupt
             except:

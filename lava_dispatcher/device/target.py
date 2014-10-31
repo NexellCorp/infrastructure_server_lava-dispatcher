@@ -227,6 +227,9 @@ class Target(object):
     def nexell_reset_or_reboot(self):
         raise NotImplementedError('nexell_reset_or_reboot')
 
+    def nexell_android_ready_working(self):
+        raise NotImplementedError('nexell_android_ready_working')
+
     def power_off(self, proc):
         if proc is not None:
             proc.close()

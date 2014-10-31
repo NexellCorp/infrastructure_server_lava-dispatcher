@@ -160,6 +160,7 @@ class cmd_submit_results(BaseAction):
             bundle_list = os.listdir(self.context.host_result_dir)
             for bundle_name in bundle_list:
                 bundle = "%s/%s" % (self.context.host_result_dir, bundle_name)
+                logging.info("bundle: %s" % bundle)
                 content = None
                 try:
                     with open(bundle) as f:
@@ -183,6 +184,8 @@ class cmd_submit_results(BaseAction):
             msg = ' '.join(errors)
             raise GatherResultsError(msg, bundles)
 
+        # psw0523 debugging
+        logging.info("_get_results_from_host(): len %d" % len(bundles))
         return bundles
 
     def run(self, server, stream, result_disk="testrootfs", token=None):
@@ -210,6 +213,8 @@ class cmd_submit_results(BaseAction):
                 status = 'fail'
                 all_bundles.extend(gre.bundles)
 
+        # psw0523 debugging
+        logging.info("collect_bundles: len %d" % len(all_bundles))
         self.context.test_data.add_result('gather_results', status, err_msg)
 
         main_bundle = self.combine_bundles(all_bundles)
@@ -246,6 +251,7 @@ class cmd_submit_results(BaseAction):
     def submit_bundle(self, main_bundle, server, stream, token):
         dashboard = _get_dashboard(server, token)
         json_bundle = DocumentIO.dumps(main_bundle)
+        print json_bundle
         job_name = self.context.job_data.get('job_name', "LAVA Results")
         try:
             result = dashboard.put_ex(json_bundle, job_name, stream)
@@ -257,6 +263,11 @@ class cmd_submit_results(BaseAction):
             logging.warning("Fault code: %d" % err.faultCode)
             logging.warning("Fault string: %s" % err.faultString)
             raise OperationFailed("could not push to dashboard")
+        # psw0523 add for remove temporary result dir
+        # finally:
+        #     import lava_dispatcher.utils import rmtree
+        #     logging.info("remove host result dir")
+        #     rmtree(self.context.host_result_dir)
 
     def submit_pending(self, bundle, server, stream, token, group_name):
         """ Called from the dispatcher job when a MultiNode job requests to

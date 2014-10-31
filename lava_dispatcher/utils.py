@@ -444,10 +444,13 @@ def wait_for_prompt(connection, prompt_pattern, timeout):
 
 # XXX Duplication: we should reuse lava-test TestArtifacts
 def generate_bundle_file_name(test_name):
+    # psw0523 patch
+    # return ("{test_id}.{time.tm_year:04}-{time.tm_mon:02}-{time.tm_mday:02}T"
+    #         "{time.tm_hour:02}:{time.tm_min:02}:{time.tm_sec:02}Z")\
+    #     .format(test_id=test_name, time=datetime.datetime.utcnow().timetuple())
     return ("{test_id}.{time.tm_year:04}-{time.tm_mon:02}-{time.tm_mday:02}T"
             "{time.tm_hour:02}:{time.tm_min:02}:{time.tm_sec:02}Z")\
-        .format(test_id=test_name, time=datetime.datetime.utcnow().timetuple())
-
+        .format(test_id=test_name, time=datetime.datetime.now().timetuple())
 
 def finalize_process(proc):
     if proc:

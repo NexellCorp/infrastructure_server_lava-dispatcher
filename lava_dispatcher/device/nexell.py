@@ -29,10 +29,12 @@ class NexellTarget(BootloaderTarget):
         # overriding
         self._scratch_dir = "/tmp"
         self._boot_type = None
+        # for file_system
+        self._file_system_called = False 
 
     def nexell_reset_or_reboot(self):
         # after this command, board state is u-boot command line
-        logging.debug("start command nexell_reset_or_reboot")
+        logging.info("start command nexell_reset_or_reboot")
         expect_response_list = ["Hit any key to stop", "nxp4330#", "nxp5430#", "- try 'help'", "BAT:", TIMEOUT]
         print("nexell_reset_or_reboot start...")
         self.proc.sendcontrol('c')
@@ -75,16 +77,16 @@ class NexellTarget(BootloaderTarget):
         output = subprocess.check_output(
             ["fastboot", "-s", usb_id, "getvar", "chip"],
             stderr=subprocess.STDOUT)
-        #print("output1: %s" % output)
+        print("output1: %s" % output)
         pattern = re.compile(r'nxp[0-9]{4}')
         chip = pattern.search(output).group(0)
         output = subprocess.check_output(
             ["fastboot", "-s", usb_id, "getvar", "product"],
             stderr=subprocess.STDOUT)
-        #print("output2: %s" % output)
+        print("output2: %s" % output)
         pattern = re.compile(r'(?P<PRODUCT>product:\s+)(?P<BOARD>[a-zA-Z]+)')
         product = pattern.search(output).group(2)
-        #print("device id: %s-%s" % (product, chip))
+        print("device id: %s-%s" % (product, chip))
         return ''.join([product, '-', chip])
 
     def _get_device_map_by_fastboot(self):
@@ -93,7 +95,7 @@ class NexellTarget(BootloaderTarget):
             [device for device in output.split() if device.startswith('usb')]
         device_map = {}
         for usb_device in usb_devices:
-            #print("usb_device: %s" % usb_device)
+            print("usb_device: %s" % usb_device)
             device_map[
                 self._get_device_id_from_usb_id(usb_id=usb_device)
             ] = usb_device
@@ -109,8 +111,9 @@ class NexellTarget(BootloaderTarget):
                 CriticalError("Check %s usb cable connected!!!"
                               % self.config.client_type)
 
-        time.sleep(1)
+        time.sleep(2)
         device_map = self._get_device_map_by_fastboot()
+        print device_map.keys()
         if target not in device_map.keys():
             raise \
                 CriticalError(
@@ -225,8 +228,14 @@ class NexellTarget(BootloaderTarget):
 
         print("Complete check android booting")
 
+    def _android_input_event(self, events):
+        for event in events:
+            logging.info("USER Input Event: %s" % event)
+            self.proc.sendline(event)
+            time.sleep(1)
+
     def nexell_boot_image(self, params):
-        print("nexell_boot_image")
+        logging.info("nexell_boot_image")
         self._check_boot_image_args(params)
         self.nexell_reset_or_reboot()
 
@@ -242,6 +251,8 @@ class NexellTarget(BootloaderTarget):
         if params['type'] == 'android':
             if 'logcat_check_msg' in params.keys() and 'logcat_check_timeout' in params.keys():
                 self._check_android_logcat_msg(params['logcat_check_msg'], int(params['logcat_check_timeout']))
+            if 'input_event' in params.keys():
+                self._android_input_event(params['input_event'])
             self.deployment_data = deployment_data.nexell_android
             self._boot_type = 'android'
             product = self.context.job_data['target'].split('-')[0]
@@ -253,12 +264,21 @@ class NexellTarget(BootloaderTarget):
             print("self.MASTER_PS1_PATTERN: %s, _master_ps1_pattern: %s" %
                 (self.MASTER_PS1_PATTERN, self._master_ps1_pattern))
 
+    def nexell_android_ready_working(self, params):
+        logging.info("nexell_android_ready_working")
+        self.proc.sendline(params['display_on_command'])
+        if 'input_event' in params.keys():
+            self._android_input_event(params['input_event'])
+
     # overriding
     @contextlib.contextmanager
     def file_system(self, partition, directory):
         logging.info('attempting to access master filesystem %r:%s',
                      partition, directory)
         # yield self.deployment_data['lava_test_dir']
+        if self._file_system_called is False:
+            subprocess.call(["rm", "-rf", "/tmp/lava"])
+            self._file_system_called = True
         yield '/tmp/lava'
 
     def _push_files_to_target(self, host_dir, target_dir):
