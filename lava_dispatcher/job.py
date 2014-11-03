@@ -379,7 +379,6 @@ class LavaTestJob(object):
                 err = None
                 try:
                     status = 'fail'
-                    logging.info("command name: %s" % action.command_name())
                     action.run(**params)
                 except ADBConnectError as err:
                     logging.info("ADBConnectError")
