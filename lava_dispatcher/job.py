@@ -366,7 +366,7 @@ class LavaTestJob(object):
             for cmd in self.job_data['actions']:
                 job_num += 1
                 params = cmd.get('parameters', {})
-                logging.info("cmd %s, job_num %d" % cmd, job_num)
+                logging.info("cmd %s, job_num %d" % (cmd, job_num))
                 if cmd.get('command').startswith('lava_android_test'):
                     if not params.get('timeout') and \
                        self.job_data.get('timeout'):
