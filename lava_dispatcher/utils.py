@@ -412,6 +412,7 @@ def connect_to_serial(context):
             continue
         elif result == 'all-good':
             atexit.register(proc.close, True)
+            logging.info("Succeed to connect_to_serial()")
             return proc
     raise CriticalError('could execute connection_command successfully')
 

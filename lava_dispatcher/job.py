@@ -284,6 +284,7 @@ class LavaTestJob(object):
         lava_commands = get_all_cmds()
         lmp_init_data = []
 
+        logging.info("LavaTestJob stat===>")
         if self.job_data['actions'][-1]['command'].startswith(
                 "submit_results"):
             submit_results = self.job_data['actions'].pop(-1)
@@ -364,6 +365,7 @@ class LavaTestJob(object):
             for cmd in self.job_data['actions']:
                 job_num += 1
                 params = cmd.get('parameters', {})
+                logging.info("cmd %s, job_num %d" % cmd, job_num)
                 if cmd.get('command').startswith('lava_android_test'):
                     if not params.get('timeout') and \
                        self.job_data.get('timeout'):
@@ -376,6 +378,7 @@ class LavaTestJob(object):
                 err = None
                 try:
                     status = 'fail'
+                    logging.info("command name: %s" % action.command_name())
                     action.run(**params)
                 except ADBConnectError as err:
                     logging.info("ADBConnectError")
