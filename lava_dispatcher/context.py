@@ -97,6 +97,7 @@ class Outputter(object):
 
 class LavaContext(object):
     def __init__(self, target, dispatcher_config, oob_file, job_data, output_dir):
+        logging.info("LavaContext init...")
         self.config = dispatcher_config
         self.job_data = job_data
         self.output = Outputter(output_dir)

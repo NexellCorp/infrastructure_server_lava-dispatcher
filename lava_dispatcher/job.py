@@ -253,6 +253,7 @@ def validate_job_data(job_data):
 
 class LavaTestJob(object):
     def __init__(self, job_json, oob_file, config, output_dir):
+        logging.info("LavaTestJob init...")
         self.job_status = 'pass'
         self.load_job_data(job_json)
         self.context = LavaContext(
