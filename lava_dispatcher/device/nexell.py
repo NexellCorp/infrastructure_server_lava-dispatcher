@@ -36,30 +36,30 @@ class NexellTarget(BootloaderTarget):
         # after this command, board state is u-boot command line
         logging.info("start command nexell_reset_or_reboot")
         expect_response_list = ["Hit any key to stop", "nxp4330#", "nxp5430#", "- try 'help'", "BAT:", TIMEOUT]
-        print("nexell_reset_or_reboot start...")
+        logging.debug("nexell_reset_or_reboot start...")
         self.proc.sendcontrol('c')
         self.proc.sendline("reboot")
-        print("end of sendline reboot")
+        logging.debug("end of sendline reboot")
         index = self.proc.expect(expect_response_list, timeout=5)
-        print("expect result %d" % index)
+        logging.debug("expect result %d" % index)
         #if index < 5:
         if index < (len(expect_response_list) - 1):
             if index == 4:
                 self.proc.sendcontrol('c')
-            print("succeed to reboot")
+            logging.info("succeed to reboot")
             self.proc.sendline("\n")
         else:
-            print("send reset command for bootloader")
+            logging.info("send reset command for bootloader")
             #time.sleep(1)
             self.proc.sendline("reset")
             index = self.proc.expect(expect_response_list, timeout=5)
             if index < (len(expect_response_list) - 1):
                 if index == 4:
                     self.proc.sendcontrol('c')
-                print("succeed to reset")
+                logging.info("succeed to reset")
                 self.proc.sendline("\n")
             else:
-                print("board state is unknown")
+                logging.info("board state is unknown")
                 raise CriticalError("Unknown Board State!!!")
 
         time.sleep(1)
